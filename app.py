@@ -1,12 +1,13 @@
-import streamlit as st
+# app.py
 import os
-import re
 
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_ollama import OllamaLLM, OllamaEmbeddings
-from langchain_core.documents import Document
+if os.getenv("PYTEST_RUNNING") != "1":
+    import streamlit as st
+    from langchain_community.document_loaders import TextLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_community.vectorstores import FAISS
+    from langchain_ollama import OllamaLLM, OllamaEmbeddings
+
 
 # ★ validate は外部ファイル
 from validate import VALIDATE_MAP, detect_rule_key
