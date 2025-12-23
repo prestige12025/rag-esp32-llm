@@ -1,9 +1,33 @@
 # app.py
 import os
-from validate import VALIDATE_MAP, detect_rule_key
 
 # =====================
-# 設定（純Pythonだけ）
+# pytest / CI safety
+# =====================
+PYTEST_RUNNING = os.getenv("PYTEST_RUNNING") == "1"
+
+# =====================
+# validate exports (pytest がここを見る)
+# =====================
+from validate import (
+    VALIDATE_MAP,
+    detect_rule_key,
+    validate_common,   # ← ★これが無かった
+)
+
+# =====================
+# Streamlit / LangChain
+# =====================
+if not PYTEST_RUNNING:
+    import streamlit as st
+    from langchain_community.document_loaders import TextLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_community.vectorstores import FAISS
+    from langchain_ollama import OllamaLLM, OllamaEmbeddings
+
+
+# =====================
+# 設定
 # =====================
 DATA_DIR = "data/esp32"
 RULE_DIR = "data/rules"
@@ -27,15 +51,12 @@ GOOD_RANKS = ["official", "recommended", "reference"]
 
 
 # =====================
-# Loader（遅延import）
+# Loader（CIでは未使用）
 # =====================
 def load_docs(path: str):
-    from langchain_community.document_loaders import TextLoader
-
     docs = []
     if not os.path.exists(path):
         return docs
-
     for f in os.listdir(path):
         if f.endswith(".md") or f.endswith(".txt"):
             docs.extend(
@@ -48,18 +69,14 @@ def load_docs(path: str):
 
 
 def build_store(docs, index_dir, embeddings):
-    from langchain_community.vectorstores import FAISS
-
     if not docs:
         return None
-
     if os.path.exists(index_dir):
         return FAISS.load_local(
             index_dir,
             embeddings,
             allow_dangerous_deserialization=True
         )
-
     store = FAISS.from_documents(docs, embeddings)
     store.save_local(index_dir)
     return store
@@ -69,11 +86,9 @@ def build_store(docs, index_dir, embeddings):
 # Streamlit main
 # =====================
 def main():
-    import streamlit as st
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_ollama import OllamaLLM, OllamaEmbeddings
+    if PYTEST_RUNNING:
+        return  # ← pytest では UI を一切起動しない
 
-    # -------- UI --------
     st.set_page_config(page_title="社内LLMナレッジ", layout="wide")
     st.title("社内技術ナレッジAI（ESP32）")
 
@@ -83,7 +98,6 @@ def main():
         horizontal=True
     )
 
-    # -------- Session --------
     for k in ["question", "last_answer", "clear_question", "force_good_example"]:
         st.session_state.setdefault(k, "")
 
@@ -91,7 +105,6 @@ def main():
         st.session_state.question = ""
         st.session_state.clear_question = False
 
-    # -------- Embedding --------
     embeddings = OllamaEmbeddings(
         model=EMBED_MODEL,
         base_url=OLLAMA_URL
@@ -102,23 +115,19 @@ def main():
         chunk_overlap=100
     )
 
-    # -------- Tech RAG --------
     tech_docs = splitter.split_documents(load_docs(DATA_DIR))
     tech_store = build_store(tech_docs, INDEX_DIR, embeddings)
     tech_retriever = tech_store.as_retriever(search_kwargs={"k": 3}) if tech_store else None
 
-    # -------- Rule RAG --------
     rule_docs = splitter.split_documents(load_docs(RULE_DIR))
     rule_store = build_store(rule_docs, RULE_INDEX_DIR, embeddings)
 
-    # -------- Good RAG --------
     def load_good_store():
         docs = splitter.split_documents(load_docs(GOOD_DIR))
         return build_store(docs, GOOD_INDEX_DIR, embeddings)
 
     good_store = load_good_store()
 
-    # -------- LLM --------
     llm = OllamaLLM(
         model=LLM_MODEL,
         base_url=OLLAMA_URL,
@@ -126,15 +135,10 @@ def main():
         timeout=30
     )
 
-    # =====================
-    # 質問・調査（RAG）
-    # =====================
     if mode == "質問・調査（RAG）":
-
         st.text_area("質問内容", height=120, key="question")
 
         if st.button("実行") and st.session_state.question.strip():
-
             q = st.session_state.question
             rule_key = detect_rule_key(q)
 
@@ -185,44 +189,12 @@ def main():
                     break
                 base_prompt += "\n【修正指示】\n" + "\n".join(errors)
 
-            if not errors:
-                os.makedirs(GOOD_DIR, exist_ok=True)
-                with open(
-                    os.path.join(GOOD_DIR, "reference.md"),
-                    "a",
-                    encoding="utf-8"
-                ) as f:
-                    f.write(answer + "\n\n")
-                good_store = load_good_store()
-
             st.session_state.last_answer = answer
             st.session_state.clear_question = True
             st.rerun()
 
         if st.session_state.last_answer:
             st.markdown(st.session_state.last_answer)
-
-    # =====================
-    # Good例管理
-    # =====================
-    else:
-        st.subheader("Good例 一覧・管理")
-
-        for rank in GOOD_RANKS:
-            path = os.path.join(GOOD_DIR, f"{rank}.md")
-            if not os.path.exists(path):
-                continue
-
-            st.markdown(f"## {rank.upper()}")
-            content = open(path, encoding="utf-8").read().split("```cpp")
-
-            for i, block in enumerate(content[1:], start=1):
-                code = "```cpp" + block.split("```")[0] + "```"
-                with st.expander(f"{rank} #{i}"):
-                    st.markdown(code)
-                    if st.button("再利用", key=f"use_{rank}_{i}"):
-                        st.session_state.force_good_example = code
-                        st.success("次回生成時に強制注入します")
 
 
 # =====================
