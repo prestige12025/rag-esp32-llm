@@ -1,0 +1,27 @@
+﻿
+```cpp
+#include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+
+#define SPI_CS 15
+
+void setup() {
+  Wire.begin();
+  SPI.begin();
+  pinMode(SPI_CS, OUTPUT);
+}
+
+void loop() {
+  Wire.requestFrom(0x48, 1);
+  if (Wire.available()) {
+    Wire.read();
+  }
+
+  SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
+  digitalWrite(SPI_CS, LOW);
+  SPI.transfer(0x00);
+  digitalWrite(SPI_CS, HIGH);
+  SPI.endTransaction();
+}
+```

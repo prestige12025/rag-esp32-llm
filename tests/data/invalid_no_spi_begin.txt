@@ -1,0 +1,14 @@
+﻿
+```cpp
+#include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+
+void setup() {
+  Wire.begin();
+}
+
+void loop() {
+  Wire.requestFrom(0x48, 1);
+}
+```

@@ -1,0 +1,39 @@
+```cpp
+#include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+
+#define I2C_ADDRESS 0x48
+#define SPI_CS_PIN 15
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  pinMode(SPI_CS_PIN, OUTPUT);
+}
+
+void loop() {
+  // I2Cセンサ値取得
+  Wire.beginTransmission(I2C_ADDRESS);
+  Wire.write(0x00); // レジスタアドレス
+  Wire.endTransmission(false);
+  Wire.requestFrom(I2C_ADDRESS, 1);
+  byte i2c_value = Wire.read();
+
+  // SPIセンサ値取得
+  digitalWrite(SPI_CS_PIN, LOW);
+  SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
+  byte spi_value = SPI.transfer(0x00); // レジスタアドレス
+  SPI.endTransaction();
+  digitalWrite(SPI_CS_PIN, HIGH);
+
+  // シリアル出力
+  Serial.print("I2C Value: ");
+  Serial.println(i2c_value);
+  Serial.print("SPI Value: ");
+  Serial.println(spi_value);
+
+  delay(1000);
+}
+```
+
