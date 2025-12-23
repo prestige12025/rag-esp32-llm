@@ -1,14 +1,9 @@
 # app.py
 import os
-
-# =====================
-# validate（純Python）
-# =====================
 from validate import VALIDATE_MAP, detect_rule_key
 
-
 # =====================
-# 設定（純Python）
+# 設定（純Pythonだけ）
 # =====================
 DATA_DIR = "data/esp32"
 RULE_DIR = "data/rules"
@@ -32,7 +27,7 @@ GOOD_RANKS = ["official", "recommended", "reference"]
 
 
 # =====================
-# Loader（import は遅延）
+# Loader（遅延import）
 # =====================
 def load_docs(path: str):
     from langchain_community.document_loaders import TextLoader
@@ -74,7 +69,6 @@ def build_store(docs, index_dir, embeddings):
 # Streamlit main
 # =====================
 def main():
-    # ---- 重い依存はここだけ ----
     import streamlit as st
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_ollama import OllamaLLM, OllamaEmbeddings
@@ -110,23 +104,12 @@ def main():
 
     # -------- Tech RAG --------
     tech_docs = splitter.split_documents(load_docs(DATA_DIR))
-    tech_store = build_store(
-        tech_docs,
-        INDEX_DIR,
-        embeddings
-    )
-    tech_retriever = (
-        tech_store.as_retriever(search_kwargs={"k": 3})
-        if tech_store else None
-    )
+    tech_store = build_store(tech_docs, INDEX_DIR, embeddings)
+    tech_retriever = tech_store.as_retriever(search_kwargs={"k": 3}) if tech_store else None
 
     # -------- Rule RAG --------
     rule_docs = splitter.split_documents(load_docs(RULE_DIR))
-    rule_store = build_store(
-        rule_docs,
-        RULE_INDEX_DIR,
-        embeddings
-    )
+    rule_store = build_store(rule_docs, RULE_INDEX_DIR, embeddings)
 
     # -------- Good RAG --------
     def load_good_store():
@@ -156,26 +139,17 @@ def main():
             rule_key = detect_rule_key(q)
 
             tech = (
-                "\n".join(
-                    d.page_content
-                    for d in tech_retriever.invoke(q[:MAX_QUERY_LEN])
-                )
+                "\n".join(d.page_content for d in tech_retriever.invoke(q[:MAX_QUERY_LEN]))
                 if tech_retriever else ""
             )[:MAX_INTERNAL_LEN]
 
             rules = (
-                "\n".join(
-                    d.page_content
-                    for d in rule_store.similarity_search(rule_key, k=3)
-                )
+                "\n".join(d.page_content for d in rule_store.similarity_search(rule_key, k=3))
                 if rule_store else ""
             )
 
             good = (
-                "\n".join(
-                    d.page_content
-                    for d in good_store.similarity_search(q, k=2)
-                )
+                "\n".join(d.page_content for d in good_store.similarity_search(q, k=2))
                 if good_store else ""
             )
 
@@ -206,12 +180,11 @@ def main():
 
             for _ in range(MAX_RETRY + 1):
                 answer = llm.invoke(base_prompt)
-                errors = validator(answer) if validator else []
+                errors = validator(answer)
                 if not errors:
                     break
                 base_prompt += "\n【修正指示】\n" + "\n".join(errors)
 
-            # --- Good 保存 ---
             if not errors:
                 os.makedirs(GOOD_DIR, exist_ok=True)
                 with open(
