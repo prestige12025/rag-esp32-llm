@@ -1,10 +1,11 @@
 # app.py
 import os
+import sys
 
 # =====================
 # pytest / CI safety
 # =====================
-PYTEST_RUNNING = os.getenv("PYTEST_RUNNING") == "1"
+IS_PYTEST = "pytest" in sys.modules
 
 # =====================
 # validate exports (pytest がここを見る)
@@ -22,7 +23,7 @@ from validate import (
 # =====================
 # Streamlit / LangChain
 # =====================
-if not PYTEST_RUNNING:
+if not IS_PYTEST:
     import streamlit as st
     from langchain_community.document_loaders import TextLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -56,6 +57,8 @@ GOOD_RANKS = ["official", "recommended", "reference"]
 # Loader（CIでは未使用）
 # =====================
 def load_docs(path: str):
+    if IS_PYTEST:
+        return []
     docs = []
     if not os.path.exists(path):
         return docs
@@ -71,7 +74,7 @@ def load_docs(path: str):
 
 
 def build_store(docs, index_dir, embeddings):
-    if not docs:
+    if IS_PYTEST or not docs:
         return None
     if os.path.exists(index_dir):
         return FAISS.load_local(
@@ -88,8 +91,8 @@ def build_store(docs, index_dir, embeddings):
 # Streamlit main
 # =====================
 def main():
-    if PYTEST_RUNNING:
-        return  # pytest では UI を起動しない
+    if IS_PYTEST:
+        return  # ← pytest では UI を一切起動しない
 
     st.set_page_config(page_title="社内LLMナレッジ", layout="wide")
     st.title("社内技術ナレッジAI（ESP32）")
