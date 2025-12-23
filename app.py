@@ -7,25 +7,38 @@ import os
 PYTEST_RUNNING = os.getenv("PYTEST_RUNNING") == "1"
 
 # =====================
-# validate exports（pytest がここを見る）
+# validate exports (pytest がここを見る)
 # =====================
 from validate import (
     VALIDATE_MAP,
     detect_rule_key,
     validate_common,
+    validate_i2c,
+    validate_spi,
+    validate_i2c_spi,
+    validate_default,
 )
 
 # =====================
-# 設定（定数は安全）
+# Streamlit / LangChain
+# =====================
+if not PYTEST_RUNNING:
+    import streamlit as st
+    from langchain_community.document_loaders import TextLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_community.vectorstores import FAISS
+    from langchain_ollama import OllamaLLM, OllamaEmbeddings
+
+
+# =====================
+# 設定
 # =====================
 DATA_DIR = "data/esp32"
 RULE_DIR = "data/rules"
-BAD_DIR = "data/bad_examples"
 GOOD_DIR = "data/good_examples"
 
 INDEX_DIR = "faiss_index"
 RULE_INDEX_DIR = "faiss_rules"
-BAD_INDEX_DIR = "faiss_bad"
 GOOD_INDEX_DIR = "faiss_good"
 
 EMBED_MODEL = "nomic-embed-text"
@@ -40,13 +53,12 @@ GOOD_RANKS = ["official", "recommended", "reference"]
 
 
 # =====================
-# Loader（実行時のみ使用）
+# Loader（CIでは未使用）
 # =====================
 def load_docs(path: str):
     docs = []
     if not os.path.exists(path):
         return docs
-
     for f in os.listdir(path):
         if f.endswith(".md") or f.endswith(".txt"):
             docs.extend(
@@ -61,14 +73,12 @@ def load_docs(path: str):
 def build_store(docs, index_dir, embeddings):
     if not docs:
         return None
-
     if os.path.exists(index_dir):
         return FAISS.load_local(
             index_dir,
             embeddings,
             allow_dangerous_deserialization=True
         )
-
     store = FAISS.from_documents(docs, embeddings)
     store.save_local(index_dir)
     return store
@@ -78,18 +88,9 @@ def build_store(docs, index_dir, embeddings):
 # Streamlit main
 # =====================
 def main():
-    # pytest / CI では UI を起動しない
     if PYTEST_RUNNING:
-        return
+        return  # pytest では UI を起動しない
 
-    # ===== 実行時 import（ここが超重要）=====
-    import streamlit as st
-    from langchain_community.document_loaders import TextLoader
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_community.vectorstores import FAISS
-    from langchain_ollama import OllamaLLM, OllamaEmbeddings
-
-    # ===== UI =====
     st.set_page_config(page_title="社内LLMナレッジ", layout="wide")
     st.title("社内技術ナレッジAI（ESP32）")
 
@@ -106,7 +107,6 @@ def main():
         st.session_state.question = ""
         st.session_state.clear_question = False
 
-    # ===== Embeddings =====
     embeddings = OllamaEmbeddings(
         model=EMBED_MODEL,
         base_url=OLLAMA_URL
@@ -117,26 +117,19 @@ def main():
         chunk_overlap=100
     )
 
-    # ===== Tech RAG =====
     tech_docs = splitter.split_documents(load_docs(DATA_DIR))
     tech_store = build_store(tech_docs, INDEX_DIR, embeddings)
-    tech_retriever = (
-        tech_store.as_retriever(search_kwargs={"k": 3})
-        if tech_store else None
-    )
+    tech_retriever = tech_store.as_retriever(search_kwargs={"k": 3}) if tech_store else None
 
-    # ===== Rule RAG =====
     rule_docs = splitter.split_documents(load_docs(RULE_DIR))
     rule_store = build_store(rule_docs, RULE_INDEX_DIR, embeddings)
 
-    # ===== Good RAG =====
     def load_good_store():
         docs = splitter.split_documents(load_docs(GOOD_DIR))
         return build_store(docs, GOOD_INDEX_DIR, embeddings)
 
     good_store = load_good_store()
 
-    # ===== LLM =====
     llm = OllamaLLM(
         model=LLM_MODEL,
         base_url=OLLAMA_URL,
@@ -144,9 +137,6 @@ def main():
         timeout=30
     )
 
-    # =====================
-    # 質問・調査（RAG）
-    # =====================
     if mode == "質問・調査（RAG）":
         st.text_area("質問内容", height=120, key="question")
 
@@ -155,26 +145,17 @@ def main():
             rule_key = detect_rule_key(q)
 
             tech = (
-                "\n".join(
-                    d.page_content
-                    for d in tech_retriever.invoke(q[:MAX_QUERY_LEN])
-                )
+                "\n".join(d.page_content for d in tech_retriever.invoke(q[:MAX_QUERY_LEN]))
                 if tech_retriever else ""
             )[:MAX_INTERNAL_LEN]
 
             rules = (
-                "\n".join(
-                    d.page_content
-                    for d in rule_store.similarity_search(rule_key, k=3)
-                )
+                "\n".join(d.page_content for d in rule_store.similarity_search(rule_key, k=3))
                 if rule_store else ""
             )
 
             good = (
-                "\n".join(
-                    d.page_content
-                    for d in good_store.similarity_search(q, k=2)
-                )
+                "\n".join(d.page_content for d in good_store.similarity_search(q, k=2))
                 if good_store else ""
             )
 
@@ -199,7 +180,7 @@ def main():
 {q}
 """
 
-            validator = VALIDATE_MAP.get(rule_key, validate_common)
+            validator = VALIDATE_MAP.get(rule_key, validate_default)
             answer = ""
             errors = []
 
