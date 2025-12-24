@@ -1,0 +1,11 @@
+﻿```cpp
+#include <Arduino.h>
+#include <Wire.h>
+
+void setup() {
+  // Wire.begin(); ← わざと書かない
+}
+
+void loop() {
+}
+```
