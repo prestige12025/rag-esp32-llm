@@ -1,13 +1,15 @@
 ﻿# Python
 __pycache__/
 *.pyc
-
-# Virtual environments
 venv/
-rag-env/
 
 # Pytest
 .pytest_cache/
 
-# VSCode
-.vscode/
+# Logs
+*.log
+logs/
+
+# Vector DB
+chroma/
+faiss_index*/

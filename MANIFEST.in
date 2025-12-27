@@ -1,0 +1,3 @@
+﻿include rag/data/rules/rules.yaml
+recursive-exclude tests *
+recursive-exclude logs *

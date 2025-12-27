@@ -1,0 +1,345 @@
+﻿default:
+  description: 共通ルール
+  severity: warning
+  auto_promote:
+    enabled: false
+    threshold: 0
+    window_hours: 0
+  auto_demote:
+    enabled: false
+    cooldown_hours: 0
+  must_include: []
+  forbid: []
+
+# ==================================================
+# ESP32 RULES
+# ==================================================
+
+i2c:
+  description: ESP32 I2C 通信ルール
+  severity: error
+  promoted: true
+  promoted_at: '2025-12-25T01:12:58'
+
+  why:
+    ja: >
+      I2C 初期化処理（Wire.begin や Serial.begin）が欠落したコードが
+      繰り返し生成され、センサーが無反応になる障害が多発した。
+      実機デバッグ時に原因特定が困難となるため、
+      I2C 関連の初期化は必須仕様として強制する。
+
+  example:
+    good: |
+      ```cpp
+      #include <Wire.h>
+
+      void setup() {
+          Serial.begin(115200);
+          Wire.begin();
+      }
+
+      void loop() {
+          // I2C communication
+      }
+      ```
+
+  auto_promote:
+    enabled: true
+    threshold: 3
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - '#include <Wire.h>'
+    - Wire.begin()
+    - Serial.begin
+
+  target_severity:
+    '#include <Wire.h>': error
+    Wire.begin(): error
+    Serial.begin: error
+
+spi:
+  description: ESP32 SPI 通信ルール
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      SPI 通信を使用するにもかかわらず SPI.h がインクルードされていないと、
+      コンパイルエラーや初期化忘れによる通信失敗が発生する。
+      特にディスプレイや SD カード利用時に影響が大きいため、
+      将来的な昇格候補として監視する。
+
+  auto_promote:
+    enabled: true
+    threshold: 3
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - '#include <SPI.h>'
+
+  target_severity:
+    '#include <SPI.h>': warning
+
+uart:
+  description: ESP32 UART 通信ルール
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      UART を利用するコードで Serial.begin が呼ばれていない場合、
+      ログ出力やデバッグが不能となり、障害解析が著しく困難になる。
+      現時点では警告扱いとしつつ、頻発した場合は昇格を検討する。
+
+  auto_promote:
+    enabled: true
+    threshold: 2
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - Serial.begin
+
+  target_severity:
+    Serial.begin: warning
+
+wifi:
+  description: ESP32 WiFi 使用ルール
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      WiFi 機能を使用する際に WiFi.h がインクルードされていないと、
+      コンパイルエラーや実行時の通信失敗が発生する。
+      ネットワーク機能は影響範囲が広いため、将来的な昇格対象として扱う。
+
+  auto_promote:
+    enabled: true
+    threshold: 2
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - '#include <WiFi.h>'
+
+  target_severity:
+    '#include <WiFi.h>': warning
+
+# ==================================================
+# 社内文書 RULES（伺い／依頼／通知）
+# ==================================================
+
+doc_polite_style:
+  description: 社内文書は敬体で記述する
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      社内向けの伺い・依頼・通知文書において文体が混在すると、
+      受け手に不信感や稚拙な印象を与える。
+      敬体（です・ます調）は事実上の社内標準である。
+
+  auto_promote:
+    enabled: true
+    threshold: 3
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - です。
+    - ます。
+
+  forbid:
+    - だ。
+    - である。
+
+  target_severity:
+    です。: warning
+    ます。: warning
+    だ。: warning
+    である。: warning
+
+doc_subject_required:
+  description: 件名（表題）を必須とする
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      件名がない社内文書は内容把握に時間を要し、
+      対応漏れや誤認の原因となる。
+      伺い・依頼文では特に重要な要素である。
+
+  auto_promote:
+    enabled: true
+    threshold: 2
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - 件名
+
+  target_severity:
+    件名: warning
+
+doc_closing_required:
+  description: 文末に結び文を含める
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      結び文がない文書は命令的・唐突な印象を与える。
+      社内コミュニケーション円滑化のため、
+      定型的な結び文を必須とする。
+
+  auto_promote:
+    enabled: true
+    threshold: 3
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - ご確認のほど
+    - 以上
+
+  target_severity:
+    ご確認のほど: warning
+    以上: warning
+
+doc_ambiguous_words:
+  description: 曖昧表現の使用禁止
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      「適宜」「なるべく」などの曖昧表現は
+      解釈の差異を生み、業務トラブルの原因となる。
+      伺い・依頼文では明確な条件や期限を記載する必要がある。
+
+  auto_promote:
+    enabled: true
+    threshold: 2
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  forbid:
+    - 適宜
+    - なるべく
+    - できれば
+
+  target_severity:
+    適宜: warning
+    なるべく: warning
+    できれば: warning
+
+# ==================================================
+# 伺い文書 専用ルール（最重要）
+# ==================================================
+
+doc_inquiry_required:
+  description: 伺い文書として承認・判断・確認を求める表現を含める
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      伺い文書であるにもかかわらず、
+      承認・判断・確認を求める表現がない場合、
+      受け手が取るべき行動が不明確となる。
+      業務停滞や差し戻し防止のため必須とする。
+
+  auto_promote:
+    enabled: true
+    threshold: 2
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  must_include:
+    - ご確認
+    - ご判断
+    - ご承認
+
+  target_severity:
+    ご確認: warning
+    ご判断: warning
+    ご承認: warning
+
+# ==================================================
+# RAG / 引用品質 RULES（★ 新規追加）
+# ==================================================
+
+require_citation:
+  description: 回答には必ず資料引用を含める
+  severity: error
+  promoted: true
+
+  why:
+    ja: >
+      RAG を使用しているにもかかわらず、
+      回答に資料引用が含まれない場合、
+      ハルシネーションとの区別が不可能となる。
+      実運用では根拠提示が必須であるため、
+      本ルールは常時 error 扱いとする。
+
+  auto_promote:
+    enabled: false
+
+  must_include:
+    - "[source:"
+
+rag_confidence:
+  description: RAG 類似度が一定以上であること
+  severity: warning
+  promoted: false
+
+  why:
+    ja: >
+      検索された資料との類似度が低い場合、
+      回答は推測に近い内容となる可能性が高い。
+      類似度が低い場合は、
+      「仕様不明」「資料に記載なし」と回答することを推奨する。
+
+  auto_promote:
+    enabled: true
+    threshold: 3
+    window_hours: 24
+
+  auto_demote:
+    enabled: true
+    cooldown_hours: 72
+
+  threshold: 0.25

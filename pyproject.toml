@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-validate"
+version = "0.1.0"
+description = "Rule-based validation system for LLM / RAG outputs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "your-name"}]
+
+dependencies = ["pyyaml"]
+
+[project.scripts]
+rag-validate = "rag.__main__:main"
+
+[tool.setuptools]
+packages = ["rag"]

@@ -1,0 +1,50 @@
+doc_inquiry:
+  subject_prefix: "件名："
+  opening: |
+    関係各位
+
+    下記の件につきまして、判断を仰ぎたく存じます。
+  closing: |
+    ご検討のほど、よろしくお願いいたします。
+
+    以上
+
+doc_request:
+  opening: |
+    関係各位
+
+    下記の件につきまして、ご対応をお願い申し上げます。
+  closing: |
+    何卒よろしくお願いいたします。
+
+    以上
+
+doc_notice:
+  opening: |
+    関係各位
+
+    下記の通りご連絡いたします。
+  closing: |
+    以上、よろしくお願いいたします。
+
+doc_admin:
+  opening: |
+    関係各位
+
+    下記の通り事務連絡いたします。
+  closing: |
+    以上
+
+doc_report:
+  opening: |
+    関係各位
+
+    下記の通りご報告いたします。
+  closing: |
+    以上
+
+doc_return:
+  opening: |
+    ご指示の件につき、下記の通りご報告いたします。
+  closing: |
+    以上
